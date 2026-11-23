@@ -49,12 +49,68 @@ pipeline {
             }
         }
 
-        // >>> [SEGURIDAD]: aquí van las etapas "Security Review (SAST)" y "Dependency Management"
+        stage('Security Review (SAST)') {
+            steps {
+                script {
+                    // Reportes: JSON completo (incluye Low) para la trazabilidad y txt legible
+                    sh 'bandit -f json -o reports/bandit.json app.py || true'
+                    sh 'bandit -f txt -o reports/bandit.txt app.py || true'
+                    // UNSTABLE (no FAIL): el build vulnerable debe terminar y archivar TODOS los reportes
+                    def hallazgos = sh(script: 'bandit -ll app.py', returnStatus: true)
+                    if (hallazgos != 0) {
+                        currentBuild.result = 'UNSTABLE'
+                        echo 'Bandit: hallazgos Medium/High -> build UNSTABLE'
+                    } else {
+                        echo 'Bandit: sin hallazgos Medium/High'
+                    }
+                }
+            }
+        }
 
-        // >>> [ZAP]: aquí van las etapas "Deploy Staging" y "DAST - OWASP ZAP"
+        stage('Dependency Management (SCA)') {
+            steps {
+                script {
+                    sh 'pip-audit -r requirements.txt -f json --progress-spinner off -o reports/pip-audit.json || true'
+                    sh 'pip-audit -r requirements.txt -f columns --progress-spinner off -o reports/pip-audit.txt || true'
+                    def vulnerabilidades = sh(script: 'pip-audit -r requirements.txt --progress-spinner off', returnStatus: true)
+                    if (vulnerabilidades != 0) {
+                        currentBuild.result = 'UNSTABLE'
+                        echo 'pip-audit: vulnerabilidades conocidas -> build UNSTABLE'
+                    } else {
+                        echo 'pip-audit: sin vulnerabilidades conocidas'
+                    }
+                }
+            }
+        }
+
+        stage('Deploy Staging') {
+            steps {
+                sh 'bash scripts/deploy.sh staging 5001'
+            }
+        }
+
+        stage('DAST - OWASP ZAP') {
+            steps {
+                script {
+                    // zap_scan.py termina con 2 si hay alertas High/Medium
+                    def zap = sh(script: 'python3 scripts/zap_scan.py http://jenkins:5001', returnStatus: true)
+                    if (zap == 2) {
+                        currentBuild.result = 'UNSTABLE'
+                        echo 'ZAP: alertas High/Medium -> build UNSTABLE'
+                    } else if (zap != 0) {
+                        error("ZAP terminó con código ${zap}")
+                    } else {
+                        echo 'ZAP: sin alertas High/Medium'
+                    }
+                }
+            }
+        }
 
         stage('Deploy Producción') {
-            // >>> [GATE]: aquí va la condición "when" que protege producción
+            // Solo se despliega si no hubo hallazgos de seguridad: Bandit, pip-audit y ZAP en verde
+            when {
+                expression { currentBuild.currentResult == 'SUCCESS' }
+            }
             steps {
                 sh 'bash scripts/deploy.sh produccion 5000'
                 script { env.PRODUCCION = env.APP_VERSION }

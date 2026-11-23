@@ -1,0 +1,11 @@
+# Dependabot: revisión semanal de las dependencias Python del proyecto.
+# Los PR que abra deben pasar por el pipeline (tests + Bandit + pip-audit + ZAP) antes de fusionarse.
+version: 2
+updates:
+  - package-ecosystem: "pip"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 10
+    labels:
+      - "dependencias"
