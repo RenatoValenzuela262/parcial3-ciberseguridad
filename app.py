@@ -19,7 +19,8 @@ from werkzeug.security import check_password_hash, generate_password_hash
 app = Flask(__name__)
 
 ## Clave de la aplicación y credenciales del administrador.
-SECRET_KEY = "SecureDev-2024-clave-super-secreta"
+# Clave de sesión: se inyecta por entorno; si no, se genera un valor aleatorio por proceso (CWE-798)
+SECRET_KEY = os.environ.get("SECRET_KEY") or secrets.token_hex(32)
 ADMIN_USUARIO = os.environ.get("ADMIN_USUARIO", "admin")
 # La clave del administrador se inyecta por entorno como hash; si no se proporciona,
 # se genera una clave aleatoria desconocida (CWE-798). Nunca MD5 (CWE-327).
