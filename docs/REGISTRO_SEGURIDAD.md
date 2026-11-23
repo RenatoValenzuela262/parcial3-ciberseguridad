@@ -9,19 +9,26 @@ y un **commit** (usa el identificador `VULN-xx` en el mensaje del commit).
 
 | # | Etapa del SDLC | Herramienta / técnica | Build | Resultado (resumen) |
 |---|---|---|---|---|
-| R1 | Código (SAST) | Bandit en el pipeline | #__ | __ hallazgos High / __ Medium / __ Low |
-| R2 | Dependencias (SCA) | pip-audit en el pipeline | #__ | __ vulnerabilidades en __ paquetes |
-| R3 | Pruebas dinámicas (DAST) | OWASP ZAP sobre staging | #__ | __ High / __ Medium / __ Low |
-| R4 | Revisión manual | Lectura de `app.py` | — | |
-| R5 | Producción | Grafana + Prometheus | — | |
+| R1 | Código (SAST) | Bandit en el pipeline | #2 | 5 hallazgos: 2 High / 2 Medium / 1 Low. Tras las correcciones: 0 hallazgos |
+| R2 | Dependencias (SCA) | pip-audit en el pipeline | #2 | 19 vulnerabilidades en 4 paquetes (Flask, Werkzeug, Jinja2, gunicorn). Pendiente de actualizar con Dependabot |
+| R3 | Pruebas dinámicas (DAST) | OWASP ZAP sobre staging | #2 | 3 High / 3 Medium / 1 Low. Tras VULN-10: 0 High / 0 Medium (build #4) |
+| R4 | Revisión manual | Lectura de `app.py` | — | Fuga de la consulta SQL en el error 500, credenciales hardcodeadas y ausencia de límite de intentos de login |
+| R5 | Producción | Grafana + Prometheus | — | Pendiente: datasource, dashboard y regla de alerta (evidencias 7 a 9) |
 
 ## 2. Vulnerabilidades identificadas y corregidas
 
 | ID | Vulnerabilidad (CWE) | Detectada por | Ubicación | Riesgo | Corrección aplicada | Commit | Build que lo verifica |
 |---|---|---|---|---|---|---|---|
-| VULN-01 | | | `app.py:__` | | | | #__ |
-| VULN-02 | | | | | | | |
-| VULN-03 | | | | | | | |
+| VULN-01 | XSS reflejado y DOM based en `/hello` (CWE-79) | ZAP | `app.py` · `hello()` | High | Escape del parámetro con `html.escape()` antes de devolver el HTML | `203eeaf` | #3 |
+| VULN-02 | Inyección SQL en `/alumnos/buscar` (CWE-89) y fuga de la consulta en el error 500 (CWE-209) | Bandit B608 + ZAP + revisión manual | `app.py` · `buscar_alumnos()` | High | Consulta parametrizada `LIKE ?` y mensaje de error genérico | `986aa19` | #3 |
+| VULN-03 | Contraseña con MD5 y credenciales de administrador hardcodeadas (CWE-327 / CWE-798) | Bandit B324 + revisión manual | `app.py` · `login()` | High | `generate_password_hash` / `check_password_hash` y credenciales inyectadas por entorno | `b97c2c3` | #3 |
+| VULN-04 | `SECRET_KEY` hardcodeada (CWE-798) | Bandit B105 | `app.py` · configuración de Flask | Low | Lectura desde variable de entorno con valor aleatorio por defecto | `37862eb` | #3 |
+| VULN-05 | `debug=True` expone el debugger de Werkzeug (CWE-94) | Bandit B201 | `app.py` · `app.run()` | High | `debug=False` | `0a56555` | #3 |
+| VULN-06 | Bind a todas las interfaces `0.0.0.0` (CWE-605) | Bandit B104 | `app.py` · `app.run()` | Medium | Host configurable por entorno con default `127.0.0.1`; el bind de gunicorn en Docker no se modifica | `c4faea7` | #3 |
+| VULN-07 | Ausencia de CSP, X-Frame-Options y X-Content-Type-Options (CWE-693) | ZAP | `app.py` · `despues_de_la_peticion()` | Medium | Cabeceras `Content-Security-Policy`, `X-Frame-Options`, `X-Content-Type-Options` y `Referrer-Policy` en todas las respuestas | `52a1ac7` | #3 |
+| VULN-08 | Ausencia de token anti-CSRF (CWE-352) | ZAP | `app.py` · `/` y `/login` | Medium | Token en sesión, campo oculto en el formulario y validación con `compare_digest` | `4c73dfc` | #3 |
+| VULN-09 | Fuerza bruta sin limitación de intentos (CWE-307) | Revisión manual | `app.py` · `login()` | Medium | Límite de 5 intentos por IP en 60 s, respondiendo HTTP 429 | `27c49f2` | #3 |
+| VULN-10 | CSP sin `form-action` y cookie de sesión sin `SameSite` (CWE-693 / CWE-1275) | ZAP | `app.py` · CSP y configuración de sesión | Medium | Directiva `form-action 'self'` y `SESSION_COOKIE_SAMESITE = 'Lax'` | `2cac8d3` | #4 |
 
 (Agrega las filas que necesites.)
 
