@@ -139,6 +139,14 @@ def despues_de_la_peticion(respuesta):
     if endpoint != "/metrics":
         HTTP_PETICIONES.labels(request.method, endpoint, str(respuesta.status_code)).inc()
         HTTP_LATENCIA.labels(endpoint).observe(time.perf_counter() - g.get("inicio", time.perf_counter()))
+    # Cabeceras de seguridad (CWE-693): mitigan XSS, clickjacking y MIME sniffing
+    respuesta.headers.setdefault("X-Content-Type-Options", "nosniff")
+    respuesta.headers.setdefault("X-Frame-Options", "DENY")
+    respuesta.headers.setdefault(
+        "Content-Security-Policy",
+        "default-src 'self'; script-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'",
+    )
+    respuesta.headers.setdefault("Referrer-Policy", "no-referrer")
     return respuesta
 
 
