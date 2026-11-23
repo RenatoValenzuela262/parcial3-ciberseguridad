@@ -10,6 +10,7 @@ import re
 import secrets
 import sqlite3
 import time
+from collections import defaultdict
 from html import escape
 
 from flask import Flask, Response, g, jsonify, render_template_string, request, session
@@ -68,6 +69,22 @@ PATRONES_ATAQUE = {
     "sqli": re.compile(r"('|%27)\s*(or|and|union)\b|union\s+select|--|;\s*drop\b|sleep\(", re.I),
     "path_traversal": re.compile(r"\.\./|\.\.\\|%2e%2e", re.I),
 }
+
+# Limitación de intentos de inicio de sesión por IP (CWE-307)
+INTENTOS_LOGIN = defaultdict(list)
+MAX_INTENTOS_LOGIN = 5
+VENTANA_LOGIN_SEG = 60
+
+
+def limite_login_excedido(ip):
+    """Registra el intento y devuelve True si la IP superó el límite en la ventana."""
+    ahora = time.time()
+    recientes = [t for t in INTENTOS_LOGIN[ip] if ahora - t < VENTANA_LOGIN_SEG]
+    INTENTOS_LOGIN[ip] = recientes
+    if len(recientes) >= MAX_INTENTOS_LOGIN:
+        return True
+    recientes.append(ahora)
+    return False
 
 PORTADA = """<!doctype html>
 <html lang="es">
@@ -248,6 +265,11 @@ def login():
     @brief Valida las credenciales del administrador enviadas por formulario.
     @return JSON con el resultado; 401 si las credenciales no son válidas.
     """
+    if limite_login_excedido(request.remote_addr):
+        LOGIN_FALLIDOS.inc()
+        app.logger.warning("Login bloqueado por exceso de intentos desde %s", request.remote_addr)
+        return jsonify({"error": "Demasiados intentos. Intente más tarde."}), 429
+
     usuario = request.form.get("usuario", "")
     clave = request.form.get("clave", "")
     token = request.form.get("csrf_token", "")
