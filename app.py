@@ -12,7 +12,7 @@ import sqlite3
 import time
 from html import escape
 
-from flask import Flask, Response, g, jsonify, render_template_string, request
+from flask import Flask, Response, g, jsonify, render_template_string, request, session
 from prometheus_client import CONTENT_TYPE_LATEST, Counter, Gauge, Histogram, generate_latest
 from werkzeug.security import check_password_hash, generate_password_hash
 
@@ -50,6 +50,18 @@ SOSPECHOSAS = Counter("peticiones_sospechosas_total", "Peticiones con patrones d
 APP_INFO = Gauge("app_info", "Versión desplegada de la aplicación", ["version"])
 APP_INFO.labels(version=VERSION).set(1)
 
+
+@app.context_processor
+def inyectar_csrf():
+    """Entrega un token anti-CSRF a las plantillas y lo guarda en la sesión (CWE-352)."""
+
+    def csrf_token():
+        if "csrf_token" not in session:
+            session["csrf_token"] = secrets.token_urlsafe(32)
+        return session["csrf_token"]
+
+    return {"csrf_token": csrf_token}
+
 ## Patrones que delatan un intento de ataque (detección, no bloqueo).
 PATRONES_ATAQUE = {
     "xss": re.compile(r"<\s*script|javascript:|onerror\s*=|onload\s*=|<\s*img", re.I),
@@ -74,6 +86,7 @@ PORTADA = """<!doctype html>
 </form>
 <h2>Acceso administrador</h2>
 <form action="/login" method="post">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
   <input name="usuario" value="admin"> <input name="clave" type="password" value="">
   <button type="submit">Entrar</button>
 </form>
@@ -237,6 +250,11 @@ def login():
     """
     usuario = request.form.get("usuario", "")
     clave = request.form.get("clave", "")
+    token = request.form.get("csrf_token", "")
+    if not token or not secrets.compare_digest(token, session.get("csrf_token", "")):
+        LOGIN_FALLIDOS.inc()
+        app.logger.warning("Token CSRF inválido desde %s", request.remote_addr)
+        return jsonify({"error": "Token CSRF inválido"}), 400
     if usuario == ADMIN_USUARIO and check_password_hash(ADMIN_PASSWORD_HASH, clave):
         LOGIN_EXITOSOS.inc()
         return jsonify({"mensaje": "Bienvenido, administrador"})
