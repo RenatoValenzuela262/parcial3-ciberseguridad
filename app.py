@@ -249,4 +249,5 @@ def metrics():
 iniciar_db()
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000, debug=False)
+    # En desarrollo se escucha solo en localhost; en Docker el bind lo hace gunicorn (deploy.sh)
+    app.run(host=os.environ.get("HOST", "127.0.0.1"), port=5000, debug=False)
