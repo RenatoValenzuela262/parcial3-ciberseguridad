@@ -29,6 +29,7 @@ ADMIN_PASSWORD_HASH = os.environ.get("ADMIN_PASSWORD_HASH") or generate_password
     secrets.token_urlsafe(24)
 )
 app.config["SECRET_KEY"] = SECRET_KEY
+app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
 
 ## Versión desplegada: la inyecta el pipeline (1.0.<build>+<commit>). Sirve para la trazabilidad.
 VERSION = os.environ.get("APP_VERSION", "dev")
@@ -174,7 +175,7 @@ def despues_de_la_peticion(respuesta):
     respuesta.headers.setdefault("X-Frame-Options", "DENY")
     respuesta.headers.setdefault(
         "Content-Security-Policy",
-        "default-src 'self'; script-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'",
+        "default-src 'self'; script-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'",
     )
     respuesta.headers.setdefault("Referrer-Policy", "no-referrer")
     return respuesta
