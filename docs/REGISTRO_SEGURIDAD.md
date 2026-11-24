@@ -13,7 +13,7 @@ y un **commit** (usa el identificador `VULN-xx` en el mensaje del commit).
 | R2 | Dependencias (SCA) | pip-audit en el pipeline | #2 → #6 | 19 vulnerabilidades en 4 paquetes (Flask, Werkzeug, Jinja2, gunicorn). Tras los PR de Dependabot: "No known vulnerabilities found" |
 | R3 | Pruebas dinámicas (DAST) | OWASP ZAP sobre staging | #2 → #6 | 3 High / 3 Medium / 1 Low. Tras VULN-10: 0 High / 0 Medium / 0 Low (builds #5 y #6); solo 2 Informational |
 | R4 | Revisión manual | Lectura de `app.py` | — | Fuga de la consulta SQL en el error 500, credenciales hardcodeadas y ausencia de límite de intentos de login |
-| R5 | Producción | Grafana + Prometheus | — | Pendiente: datasource, dashboard y regla de alerta (evidencias 7 a 9) |
+| R5 | Producción | Grafana + Prometheus | — | Configurado: datasource `http://prometheus:9090`, dashboard `Producción · Sistema Alumnos` (4 paneles) y regla `IncidenteSeguridadProduccion` (umbral > 5). Detectó 2 ráfagas de ataque (ver sección 4) |
 
 ## 2. Vulnerabilidades identificadas y corregidas
 
@@ -52,9 +52,16 @@ Escaneo sobre staging (`http://jenkins:5001`). Antes de las correcciones (build 
 
 ## 4. Monitoreo e incidentes
 
+**Configuración:** datasource Prometheus (`http://prometheus:9090`), dashboard `Producción · Sistema Alumnos` con 4 paneles (`login_fallidos_total`, `peticiones_sospechosas_total` por `tipo`, `http_requests_total` por `status` y `app_info`) y regla de alerta `IncidenteSeguridadProduccion` con condición `WHEN last() OF A IS ABOVE 5`, evaluación cada 10 s y *Pending period: None* (disparo inmediato).
+
+**Detección:** la regla se mantuvo en **Normal** mientras no hubo ataques (consulta = 0). Las dos ráfagas del script `scripts/simular_ataque.py` provocaron el paso a **Firing**; el contador acumulado pasó de 0 → 31 → 62 y volvió a Normal al salir el pico de la ventana de 1 minuto.
+
 | Hora | Panel / métrica de Grafana | Qué se observó | Entorno | Clasificación | Acción de respuesta | Verificación |
 |---|---|---|---|---|---|---|
-| | | | | | | |
+| 2026-11-23 21:29:10 | `login_fallidos_total` (0 → 31), `peticiones_sospechosas_total{tipo="sqli"/"xss"}`, `http_requests_total{status="429"}` | 31 intentos de login en ~1 s; 1 patrón SQLi y 1 XSS detectados; mayoría de respuestas HTTP 429. Consulta de alerta = 31 (> 5) → **Firing** | Producción · `jenkins:5000` (job `produccion`) | Intento de fuerza bruta (CWE-307) + inyección SQL (CWE-89) + XSS reflejado (CWE-79) | Defensas ya desplegadas (build #7, `1.0.7+360f7f2`): rate limit 5 intentos/60 s → 429, consulta parametrizada, `html.escape()` y cabeceras CSP. Sin cambios de código durante el incidente | SQLi no devolvió datos internos; XSS escapado; `/health` y `/version` siguen OK; versión sin cambios; alerta volvió a Normal tras ~1 min |
+| 2026-11-23 21:33:40 | `login_fallidos_total` (31 → 62) y `http_requests_total{status="429"}` | Segunda ráfaga de +31 intentos; la alerta volvió a **Firing** y el panel de login fallidos repitió el pico | Producción · `jenkins:5000` | Repetición del mismo ataque de laboratorio para verificar la recuperación de la alerta | Sin intervención manual: el rate limiting bloqueó automáticamente las peticiones | 429 sostenidos, servicio estable; la alerta volvió a Normal al expirar la ventana `[1m]`; build #7 sigue en SUCCESS |
+
+**Resultado:** el monitoreo detectó ambos intentos, la clasificación fue correcta y las defensas respondieron sin intervención manual. No se requirió ningún commit ni despliegue nuevo: la versión en producción permaneció en `1.0.7+360f7f2`.
 
 ## 5. Gestión de dependencias
 
