@@ -65,20 +65,28 @@ Escaneo sobre staging (`http://jenkins:5001`). Antes de las correcciones (build 
 
 ## 5. Gestión de dependencias
 
+La configuración `.github/dependabot.yml` (ecosistema `pip`, directorio `/`, frecuencia semanal, límite 10 PRs y etiqueta `dependencias`) hizo que Dependabot detectara 19 vulnerabilidades en 4 paquetes y abriera los PRs #1 a #6. Todos fueron fusionados; el build #8 confirma que no se introdujeron vulnerabilidades nuevas.
+
 | Paquete | Versión inicial | Vulnerabilidades (IDs) | Versión final | Origen del cambio (PR de Dependabot / manual) | ¿Pruebas, pip-audit y ZAP siguen OK? Build |
 |---|---|---|---|---|---|
-| Flask | 2.2.2 | | | | |
-| Werkzeug | 2.2.2 | | | | |
-| Jinja2 | 3.1.2 | | | | |
-| gunicorn | 21.2.0 | | | | |
-| prometheus-client | 0.17.1 | | | | |
+| Flask | 2.2.2 | PYSEC-2023-62, PYSEC-2026-2151 | 3.1.3 | PR #5 (`dependabot[bot]`) | Sí · #8 (9/9 pruebas, pip-audit 0 vuln., ZAP 0/0/0) |
+| Werkzeug | 2.2.2 | PYSEC-2023-57, PYSEC-2023-58, PYSEC-2023-221, PYSEC-2026-2043, PYSEC-2026-2044, PYSEC-2026-2045, PYSEC-2026-2046, PYSEC-2026-2320, PYSEC-2026-3417, PYSEC-2026-4312 | 3.1.9 | PR #3 (`dependabot[bot]`) | Sí · #8 |
+| Jinja2 | 3.1.2 | PYSEC-2026-1471, PYSEC-2026-1472, PYSEC-2026-1473, PYSEC-2026-1474, PYSEC-2026-1475 | 3.1.6 | PR #1 (`dependabot[bot]`) | Sí · #8 |
+| gunicorn | 21.2.0 | PYSEC-2026-1433, PYSEC-2026-1434 | 27.0.1 | PR #6 (`dependabot[bot]`) | Sí · #8 |
+| prometheus-client | 0.17.1 | Sin CVEs (actualización preventiva) | 0.26.0 | PR #2 (`dependabot[bot]`) | Sí · #8 |
+| pytest (desarrollo) | 8.3.4 | Sin CVEs (actualización preventiva) | 9.2.0 | PR #4 (`dependabot[bot]`, `requirements-dev.txt`) | Sí · #8 |
+
+**Cómo se aseguró que no hubiera nuevas vulnerabilidades:** cada PR se fusionó y el pipeline volvió a ejecutar las 9 pruebas funcionales, Bandit (0 hallazgos), pip-audit (*"No known vulnerabilities found"*) y OWASP ZAP sobre staging (0 High / 0 Medium / 0 Low). El build #6 fue el primero en verde tras los merges y el #8 lo confirmó de nuevo. Los conflicts de `requirements.txt` entre PRs se resolvieron conservando siempre la versión más alta de cada paquete.
 
 ## 6. Trazabilidad
 
-Pega aquí (o adjunta) el `TRAZABILIDAD.md` del último build y completa un recorrido por cada actividad del pipeline:
+El detalle completo, build por build, está en [`docs/TRAZABILIDAD.md`](TRAZABILIDAD.md) (copia del artifact `reports/TRAZABILIDAD.md` del build #8, generado por `scripts/trazabilidad.py`). Cada fila une build ↔ versión ↔ commit ↔ pruebas ↔ hallazgos ↔ despliegue.
 
 | Actividad | Hallazgo | Build que lo detectó | Commit / PR que lo resolvió | Build que lo verificó | Versión en producción |
 |---|---|---|---|---|---|
-| Revisión de seguridad (Bandit) | | #__ | | #__ | |
-| Prueba automatizada (OWASP ZAP) | | #__ | | #__ | |
-| Gestión de dependencias (Dependabot) | | #__ | PR #__ | #__ | |
+| Revisión de seguridad (Bandit) | 5 hallazgos (2 High / 2 Medium / 1 Low): B608, B324, B201, B104, B105 | #2 | Commits `203eeaf`…`2cac8d3` (VULN-01 a VULN-10) | #3 (Bandit 0/0/0) y #8 | 1.0.8+0035535 |
+| Prueba automatizada (OWASP ZAP) | 7 alertas (3 High / 3 Medium / 1 Low) + 2 nuevas tras la primera corrección | #2 y #3 | VULN-01, VULN-02, VULN-07, VULN-08, VULN-10 | #5 (0/0/0) y #8 | 1.0.8+0035535 |
+| Gestión de dependencias (Dependabot) | 19 vulnerabilidades en 4 paquetes (Flask, Werkzeug, Jinja2, gunicorn) | #2 | PRs #1 a #6 de `dependabot[bot]` | #6 (0 vuln., primer SUCCESS) y #8 | 1.0.8+0035535 |
+| Monitoreo (Grafana + Prometheus) | 2 ráfagas de ataque en producción (21:29:10 y 21:33:40) | Alerta `IncidenteSeguridadProduccion` | Defensas ya desplegadas: rate limit, consulta parametrizada y escape HTML (sin commit nuevo) | #8 (SUCCESS, versión sin cambios) | 1.0.8+0035535 |
+
+**Recorrido completo del SDLC:** el build #2 dejó constancia del código vulnerable (Bandit 2/2/1, pip-audit 19 vuln., ZAP 3/3/1) y bloqueó el despliegue a producción. Las correcciones `VULN-01`…`VULN-10` y los PRs de Dependabot se fueron integrando en los builds #3 a #6, hasta alcanzar el primer pipeline verde con despliegue seguro. Los builds #7 y #8 añadieron la documentación y el monitoreo sin alterar el código desplegado. El resultado es trazable desde cada hallazgo hasta su commit/PR, su build verificador y la versión final en producción.
