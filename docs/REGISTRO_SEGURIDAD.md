@@ -80,13 +80,13 @@ La configuración `.github/dependabot.yml` (ecosistema `pip`, directorio `/`, fr
 
 ## 6. Trazabilidad
 
-El detalle completo, build por build, está en [`docs/TRAZABILIDAD.md`](TRAZABILIDAD.md) (copia del artifact `reports/TRAZABILIDAD.md` del build #8, generado por `scripts/trazabilidad.py`). Cada fila une build ↔ versión ↔ commit ↔ pruebas ↔ hallazgos ↔ despliegue.
+El detalle completo, build por build, está en [`docs/TRAZABILIDAD.md`](TRAZABILIDAD.md) (copia del artifact `reports/TRAZABILIDAD.md` del build final en verde, generado por `scripts/trazabilidad.py`). Cada fila une build ↔ versión ↔ commit ↔ pruebas ↔ hallazgos ↔ despliegue.
 
 | Actividad | Hallazgo | Build que lo detectó | Commit / PR que lo resolvió | Build que lo verificó | Versión en producción |
 |---|---|---|---|---|---|
-| Revisión de seguridad (Bandit) | 5 hallazgos (2 High / 2 Medium / 1 Low): B608, B324, B201, B104, B105 | #2 | Commits `203eeaf`…`2cac8d3` (VULN-01 a VULN-10) | #3 (Bandit 0/0/0) y #8 | 1.0.8+0035535 |
-| Prueba automatizada (OWASP ZAP) | 7 alertas (3 High / 3 Medium / 1 Low) + 2 nuevas tras la primera corrección | #2 y #3 | VULN-01, VULN-02, VULN-07, VULN-08, VULN-10 | #5 (0/0/0) y #8 | 1.0.8+0035535 |
-| Gestión de dependencias (Dependabot) | 19 vulnerabilidades en 4 paquetes (Flask, Werkzeug, Jinja2, gunicorn) | #2 | PRs #1 a #6 de `dependabot[bot]` | #6 (0 vuln., primer SUCCESS) y #8 | 1.0.8+0035535 |
-| Monitoreo (Grafana + Prometheus) | 2 ráfagas de ataque en producción (21:29:10 y 21:33:40) | Alerta `IncidenteSeguridadProduccion` | Defensas ya desplegadas: rate limit, consulta parametrizada y escape HTML (sin commit nuevo) | #8 (SUCCESS, versión sin cambios) | 1.0.8+0035535 |
+| Revisión de seguridad (Bandit) | 5 hallazgos (2 High / 2 Medium / 1 Low): B608, B324, B201, B104, B105 | #2 | Commits `203eeaf`…`2cac8d3` (VULN-01 a VULN-10) | #3 (Bandit 0/0/0) y #9 | 1.0.9+84e570d |
+| Prueba automatizada (OWASP ZAP) | 7 alertas (3 High / 3 Medium / 1 Low) + 2 nuevas tras la primera corrección | #2 y #3 | VULN-01, VULN-02, VULN-07, VULN-08, VULN-10 | #5 (0/0/0) y #9 | 1.0.9+84e570d |
+| Gestión de dependencias (Dependabot) | 19 vulnerabilidades en 4 paquetes (Flask, Werkzeug, Jinja2, gunicorn) | #2 | PRs #1 a #6 de `dependabot[bot]` | #6 (0 vuln., primer SUCCESS) y #9 | 1.0.9+84e570d |
+| Monitoreo (Grafana + Prometheus) | 2 ráfagas de ataque en producción (21:29:10 y 21:33:40) | Alerta `IncidenteSeguridadProduccion` | Defensas ya desplegadas: rate limit, consulta parametrizada y escape HTML (sin commit nuevo) | #9 (SUCCESS, mismo código que #8) | 1.0.9+84e570d |
 
 **Recorrido completo del SDLC:** el build #2 dejó constancia del código vulnerable (Bandit 2/2/1, pip-audit 19 vuln., ZAP 3/3/1) y bloqueó el despliegue a producción. Las correcciones `VULN-01`…`VULN-10` y los PRs de Dependabot se fueron integrando en los builds #3 a #6, hasta alcanzar el primer pipeline verde con despliegue seguro. Los builds #7 y #8 añadieron la documentación y el monitoreo sin alterar el código desplegado. El resultado es trazable desde cada hallazgo hasta su commit/PR, su build verificador y la versión final en producción.

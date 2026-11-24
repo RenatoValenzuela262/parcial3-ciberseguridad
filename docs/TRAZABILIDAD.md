@@ -2,7 +2,7 @@
 
 Cada fila la agrega Jenkins al terminar un build (`scripts/trazabilidad.py`).
 
-Copia del artifact `reports/TRAZABILIDAD.md` del **build #8** (el resultado con el monitoreo documentado). El registro original se actualiza en cada build en `/var/jenkins_home/registro-trazabilidad/TRAZABILIDAD.md`.
+Copia del artifact `reports/TRAZABILIDAD.md` del **build #9** (build final, en verde). El registro original se actualiza en cada build en `/var/jenkins_home/registro-trazabilidad/TRAZABILIDAD.md`.
 
 | Build | Fecha (UTC) | Versión | Commit | Mensaje del commit | Pruebas | Bandit H/M/L | pip-audit | ZAP H/M/L | Resultado | Producción |
 |---|---|---|---|---|---|---|---|---|---|---|
@@ -14,3 +14,4 @@ Copia del artifact `reports/TRAZABILIDAD.md` del **build #8** (el resultado con 
 | 6 | 2026-11-23 22:58 | 1.0.6+8c950d0 | `8c950d0` | Merge PR #4 | 9/9 OK | 0/0/0 | 0 vuln. | 0/0/0 | SUCCESS | 1.0.6+8c950d0 |
 | 7 | 2026-11-23 23:20 | 1.0.7+360f7f2 | `360f7f2` | Doc: seccion 3 con resultados ZAP antes/despues y ajuste de builds (ev | 9/9 OK | 0/0/0 | 0 vuln. | 0/0/0 | SUCCESS | 1.0.7+360f7f2 |
 | 8 | 2026-11-24 00:43 | 1.0.8+0035535 | `0035535` | Doc: seccion 4 con monitoreo e incidentes detectados en Grafana (evide | 9/9 OK | 0/0/0 | 0 vuln. | 0/0/0 | SUCCESS | 1.0.8+0035535 |
+| 9 | 2026-11-24 00:57 | 1.0.9+84e570d | `84e570d` | Doc: secciones 5 y 6 (dependencias y trazabilidad) y registro de traza | 9/9 OK | 0/0/0 | 0 vuln. | 0/0/0 | SUCCESS | 1.0.9+84e570d |
